@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "546575061696",
+    "project_id": "realtime-database-todo",
+    "storage_bucket": "realtime-database-todo.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:546575061696:android:dc296101fca00250811325",
+        "android_client_info": {
+          "package_name": "com.jurakuziyev.realtime_database_todo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAEDdKxbclkfEQPsg1IRF6ikCwWVyJUIXg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
