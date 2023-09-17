@@ -32,17 +32,17 @@ class MainSignButton extends StatelessWidget {
             if (signText == "Sign Up") {
               context.read<AuthBloc>().add(
                     SignUpEvent(
-                      username: nameCtrl!.text,
-                      email: emailCtrl.text,
-                      password: passwordCtrl.text,
-                      confirmPassword: confirmCtrl!.text,
+                      username: nameCtrl!.text.trim(),
+                      email: emailCtrl.text.trim(),
+                      password: passwordCtrl.text.trim(),
+                      confirmPassword: confirmCtrl!.text.trim(),
                     ),
                   );
             } else {
               context.read<AuthBloc>().add(
                     SignInEvent(
-                      email: emailCtrl.text,
-                      password: passwordCtrl.text,
+                      email: emailCtrl.text.trim(),
+                      password: passwordCtrl.text.trim(),
                     ),
                   );
             }

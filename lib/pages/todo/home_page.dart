@@ -4,68 +4,207 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:lottie/lottie.dart';
+import 'package:realtime_database_todo/blocs/auth/auth_bloc.dart';
 import 'package:realtime_database_todo/blocs/real_database/todo_db_bloc.dart';
+import 'package:realtime_database_todo/pages/registration/sign_in_page.dart';
 import 'package:realtime_database_todo/pages/todo/create_page.dart';
 import 'package:realtime_database_todo/pages/todo/edit_page.dart';
+import 'package:realtime_database_todo/service/constants/strings.dart';
 import 'package:realtime_database_todo/views/alert_dialog.dart';
 import 'package:realtime_database_todo/views/loading_builder.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({Key? key}) : super(key: key);
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
+  void showWarningDialog(BuildContext ctx) {
+    final controller = TextEditingController();
+    showDialog(
+      context: ctx,
+      builder: (context) {
+        return BlocConsumer<AuthBloc, AuthState>(
+          listener: (context, state) {
+            if (state is DeleteAccountSuccess) {
+              Navigator.of(context).pop();
+              if (ctx.mounted) {
+                Navigator.of(ctx).pushReplacement(
+                    MaterialPageRoute(builder: (context) => const SignInPage()));
+              }
+            }
+
+            if (state is AuthFailure) {
+              Navigator.of(context).pop();
+              Navigator.of(ctx).pop();
+            }
+          },
+          builder: (context, state) {
+            return Stack(
+              children: [
+                AlertDialog(
+                  title: const Text("Delete Account"),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        state is DeleteConfirmSuccess
+                            ? "Please confirm password to delete account"
+                            : "Do you want to delete account?",
+                      ),
+                      const SizedBox(
+                        height: 10,
+                      ),
+                      if (state is DeleteConfirmSuccess)
+                        TextField(
+                          controller: controller,
+                          decoration:
+                              const InputDecoration(hintText: Strings.password),
+                        ),
+                    ],
+                  ),
+                  actionsAlignment: MainAxisAlignment.spaceBetween,
+                  actions: [
+                    /// #cancel
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: const Text("Cancel"),
+                    ),
+
+                    /// #confirm #delete
+                    ElevatedButton(
+                      onPressed: () {
+                        if (state is DeleteConfirmSuccess) {
+                          context
+                              .read<AuthBloc>()
+                              .add(DeleteAccountEvent(controller.text.trim()));
+                        } else {
+                          context
+                              .read<AuthBloc>()
+                              .add(const DeleteConfirmEvent());
+                        }
+                      },
+                      child: Text(
+                        state is DeleteConfirmSuccess ? "Delete" : "Confirm",
+                      ),
+                    ),
+                  ],
+                ),
+                if (state is AuthLoading)
+                  const Center(
+                    child: CircularProgressIndicator(),
+                  )
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   late DatabaseReference dbRef;
 
   @override
   void initState() {
-    super.initState();
     dbRef = FirebaseDatabase.instance.ref().child("Todos");
+    super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: const Drawer(),
+      onDrawerChanged: (value) {
+        if (value) {
+          context.read<AuthBloc>().add(const GetUserEvent());
+        }
+      },
       appBar: AppBar(
-        title: Text(
-          'All Todos',
-          style: GoogleFonts.hennyPenny(),
-        ),
-        centerTitle: true,
         actions: [
           IconButton(
             onPressed: () {
-              showCupertinoDialog(
-                context: context,
-                builder: (context) {
-                  return const LogOutAlertDialog();
-                },
-              );
+              context.read<AuthBloc>().add(const SignOutEvent());
             },
-            icon: const Icon(
-              Icons.logout,
-            ),
-          ),
+            icon: const Icon(Icons.logout),
+          )
         ],
       ),
-      body: BlocListener<TodoBloc, TodoState>(
-        listener: (context, state) {
+      drawer: Drawer(
+        child: Column(
+          children: [
+            BlocBuilder<AuthBloc, AuthState>(
+              builder: (context, state) {
+                final String name = state is GetUserSuccess
+                    ? state.user.displayName!
+                    : "accountName";
+                final String email =
+                    state is GetUserSuccess ? state.user.email! : "accountName";
 
-          /// Delete Success
-          if (state is TodoRemoveSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Todo successfully deleted."),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
-        },
+                return UserAccountsDrawerHeader(
+                  accountName: Text(name),
+                  accountEmail: Text(email),
+                );
+              },
+            ),
+            ListTile(
+              onTap: () => showWarningDialog(context),
+              title: const Text("Delete Account"),
+            )
+          ],
+        ),
+      ),
+      body: MultiBlocListener(
+        listeners: [
+          /// AuthListener
+          BlocListener<AuthBloc, AuthState>(
+            listener: (context, state) {
+              /// Auth failure
+              if (state is AuthFailure) {
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(SnackBar(content: Text(state.errorMsg)));
+              }
+
+              /// Delete Account Success
+              if (state is DeleteAccountSuccess && context.mounted) {
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(SnackBar(content: Text(state.message)));
+              }
+
+              /// Sign Out Success
+              if (state is SignOutSuccess) {
+                Navigator.of(context).pushReplacement(MaterialPageRoute(
+                    builder: (context) => const SignInPage()));
+              }
+            },
+          ),
+
+          /// TodoListener
+          BlocListener<TodoBloc, TodoState>(
+            listener: (context, state) {
+              /// Log out success
+              if (state is SignOutSuccess) {
+                Navigator.of(context).pushReplacement(
+                  CupertinoPageRoute(
+                    builder: (builder) => const SignInPage(),
+                  ),
+                );
+              }
+
+              /// Todo Delete Success
+              if (state is TodoRemoveSuccess) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Todo successfully deleted."),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            },
+          )
+        ],
         child: Stack(
           children: [
             Center(
